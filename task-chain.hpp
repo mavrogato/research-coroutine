@@ -8,19 +8,19 @@ inline namespace task_chain
 {
     struct task {
         struct promise_type {
-            std::coroutine_handle<> next;
+            std::coroutine_handle<> continuation;
             void unhandled_exception() { throw; }
             auto get_return_object() { return task{*this}; }
             auto initial_suspend() { return std::suspend_always{}; }
             auto final_suspend() noexcept { return std::suspend_always{}; }
             auto yield_value(bool cont) {
                 struct awaiter {
-                    std::coroutine_handle<> next;
+                    std::coroutine_handle<> continuation;
                     bool await_ready() { return false; }
-                    auto await_suspend(std::coroutine_handle<>) { return this->next; }
+                    auto await_suspend(std::coroutine_handle<>) { return this->continuation; }
                     void await_resume() {}
                 };
-                return awaiter{ cont ? this->next : std::noop_coroutine() };
+                return awaiter{ cont ? this->continuation : std::noop_coroutine() };
             }
             void return_void() { }
         };
@@ -33,7 +33,7 @@ inline namespace task_chain
         {
         }
         void set_next(task& t) {
-            this->handle.promise().next = t.handle;
+            this->handle.promise().continuation = t.handle;
         }
         void start() {
             if (!this->handle.done()) this->handle.resume();

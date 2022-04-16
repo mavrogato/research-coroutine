@@ -9,33 +9,33 @@ inline namespace task_joint
     template <class T>
     struct task {
         struct promise_type {
-            std::coroutine_handle<> previous;
+            std::coroutine_handle<> continuation;
             T result;
             void unhandled_exception() { throw; }
             auto get_return_object() { return task{*this}; }
             auto initial_suspend() { return std::suspend_always{}; }
             auto final_suspend() noexcept {
-                struct final_awaiter {
+                struct awaiter {
                     bool await_ready() noexcept { return false; }
                     void await_resume() noexcept { }
                     auto await_suspend(std::coroutine_handle<promise_type> handle) noexcept {
                         /* 
-                           final_awaiter::await_suspend is called when the execution of the
+                           awaiter::await_suspend is called when the execution of the
                            current coroutine (referred to by 'handle') is about to finish.
                            If the current coroutine was resumed by another coroutine via
                            co_await get_task(), a handle to that coroutine has been stored
-                           as handle.promise().previous. In that case, return the handle to resume
-                           the previous coroutine.
+                           as handle.promise().continuation. In that case, return the handle
+                           to resume the previous coroutine.
                            Otherwise, return noop_coroutine(), whose resumption does nothing.
                         */
-                        std::coroutine_handle<> previous = handle.promise().previous;
-                        if (!previous) {
-                            previous = std::noop_coroutine();
+                        std::coroutine_handle<> continuation = handle.promise().continuation;
+                        if (!continuation) {
+                            continuation = std::noop_coroutine();
                         }
-                        return previous;
+                        return continuation;
                     }
                 };
-                return final_awaiter{};
+                return awaiter{};
             }
             void return_value(T value) { this->result = std::move(value); }
         };
@@ -52,7 +52,7 @@ inline namespace task_joint
                 bool await_ready() { return false; }
                 T await_resume() { return std::move(this->handle.promise().result); }
                 auto await_suspend(std::coroutine_handle<> handle) {
-                    this->handle.promise().previous = handle;
+                    this->handle.promise().continuation = handle;
                     return this->handle;
                 }
                 std::coroutine_handle<promise_type> handle;
